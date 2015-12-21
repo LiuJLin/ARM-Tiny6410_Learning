@@ -134,6 +134,7 @@ static long s3c6410_leds_ioctl(struct file *filp, unsigned int cmd, unsigned lon
 	}
 	return 0;
 }
+// }}}
 
 
 // {{{ read
@@ -158,8 +159,107 @@ static ssize_t s3c6410_leds_read(struct file *filep, char __user *buf, size_t co
 // {{{ file_operations
 static struct file_operations S3C6410_LEDS_FOPS =
 {
+	.owner	=  THIS_MODULE,
+	.open	=  s3c6410_leds_open,
+	.release=  s3c6410_leds_close,
+	.read	=  s3c6410_leds_read,
+	.unlocked_ioctl = s3c6410_leds_ioctl,
+};
+// }}}
 
+// {{{ module init
+// 执行insmod命令时便会调用此函数
+// static int __init init_module(void) //默认驱动初始化函数，若不用默认函数就要添加宏module_init()
+// __init 宏，只有静态链接驱动到内核时才有用，表示将此函数代码放在".init.text"段中；使用一次之后释放这段内存；
+static int __init s3c6410_leds_init(void)
+{
+	int ret;
+	printk(DEVICE_NAME ", char device init.\n");
+	
+	if (DEVICI_MAJOR)
+	{
+		leds_dev_t = MKDEV(DEVICE_MAJOR, 0);//通过主次设备号来生成dev_t类型的设备号
+		ret = register_chrdev_region(leds_dev_t, 1, DEVICE_NAME);//
+		if(ret < 0)  // register failed
+		{
+			printk(KERN_WARNING "register device numbers error.\n");
+			return ret;
+		}
+	}
+	else  //DEVICE_NAME == 0, 自动分配设备号并注册
+	{
+		//int alloc_chrdev_region(dev_t *dev, unsigned int firstminor, unsigned int count, char *name);
+		int leds_major = 0;
+		ret = alloc_chrdev_region(&leds_dev_t, 0, 1, DEVICE_NAME);
+		if(ret < 0)
+		{
+			printk(KERN_WARNING "alloc char device number error\n");
+			return ret;
+		}
+		leds_major = MAJOR(leds_dev_t);
+		printk(KERN_ALERT "leds device major = %d.\n",leds_major);
+	}
+
+	cdev_init(&leds_cdev, &S3C6410_LEDS_FOPS);
+	cdev_add(&leds_dev, leds_dev_t, 1);
+	
+	return 0;
 }
+// }}}
+
+// {{{ module exit
+// 执行rmmod命令时调用此函数
+// static int __exit cleanup_module(void)  //默认驱动清除函数
+// __exit 宏，表示将此函数代码放在".exit.data"段
+static void __exit s3c6410_leds_exit(void)
+{
+	//卸载驱动程序
+	printk(DEVICE_NAME " module exit.\n");
+	cdev_del(&leds_cdev);// 注销chr_dev对应的字符设备对象
+
+	unregister_chrdev_region(leds_dev_t, 1);//释放分配的设备号
+}
+// }}}
+
+//指定驱动程序的初始化和卸载函数
+module_init(s3c6410_leds_init);
+module_exit(s3c6410_leds_exit);
+
+// {{{ module description)
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Tiny6410 LED_char Driver");
+// }}}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
